@@ -21,6 +21,7 @@ function App() {
     isLoading,
     isUploading,
     handleFileUpload,
+    handleImportSRT,
     handleTranscribe,
     handleSearch,
     onDragEnd,
@@ -44,13 +45,26 @@ function App() {
                 isUploading={isUploading}
                 videos={videos}
               />
-              <button
-                onClick={handleTranscribe}
-                disabled={videos.length === 0}
-                className="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
-              >
-                Transcribe
-              </button>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={handleTranscribe}
+                  disabled={videos.length === 0}
+                  className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
+                >
+                  Transcribe
+                </button>
+                <label
+                  className={`bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition text-center cursor-pointer ${videos.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}
+                >
+                  Import SRT
+                  <input
+                    type="file"
+                    accept=".srt"
+                    onChange={handleImportSRT}
+                    className="hidden"
+                  />
+                </label>
+              </div>
               <SearchControls
                 handleSearchQueryChange={handleSearchQueryChange}
                 handleSearchTypeChange={handleSearchTypeChange}

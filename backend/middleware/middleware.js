@@ -27,4 +27,15 @@ const upload = multer({
   }
 });
 
-module.exports = upload;
+const srtUpload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === '.srt') {
+      return cb(null, true);
+    }
+    cb(new Error('Only .srt files are allowed'));
+  }
+});
+
+module.exports = { upload, srtUpload };
