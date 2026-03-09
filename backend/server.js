@@ -4,7 +4,7 @@ const cors = require('cors');
 const routes = require('./routes/routes');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 
 app.use(cors());
@@ -25,6 +25,18 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Error: Port ${PORT} is already in use.`);
+    console.error('This is common on macOS where AirPlay Receiver uses port 5000.');
+    console.error(`To fix this, either:`);
+    console.error(`  1. Set a different port: PORT=3001 npm start`);
+    console.error(`  2. Stop the process using port ${PORT}`);
+    process.exit(1);
+  }
+  throw err;
 });
