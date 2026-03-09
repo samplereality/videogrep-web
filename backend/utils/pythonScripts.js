@@ -69,14 +69,29 @@ except Exception as e:
 exports.ngramsScript = (files, n) => `
 import sys
 import json
-import videogrep
+import os
+import re
 from collections import Counter
 
 files = ${JSON.stringify(files)}
 n = ${JSON.stringify(n)}
 
 try:
-    ngrams = videogrep.get_ngrams(files, n=n)
+    words = []
+    for file in files:
+        transcript_file = os.path.splitext(file)[0] + '.json'
+        if not os.path.exists(transcript_file):
+            print(f"No transcript found for {file}", file=sys.stderr)
+            continue
+        with open(transcript_file, 'r', encoding='utf-8') as f:
+            transcript = json.load(f)
+        for line in transcript:
+            if "words" in line:
+                words += [w["word"].strip() for w in line["words"] if w.get("word", "").strip()]
+            elif "content" in line:
+                words += [w for w in re.split(r'[^\\w]+', line["content"]) if w]
+
+    ngrams = list(zip(*[words[i:] for i in range(n)]))
     most_common = Counter(ngrams).most_common(100)
     print(json.dumps(most_common))
 except Exception as e:
