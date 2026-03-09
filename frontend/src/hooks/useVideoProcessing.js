@@ -93,6 +93,31 @@ export function useVideoProcessing() {
     }
   };
 
+  const handleImportSRT = async (event) => {
+    const file = event.target.files[0];
+    if (!file || videos.length === 0) return;
+
+    const formData = new FormData();
+    formData.append('srt', file);
+    formData.append('videoFile', videos[0]);
+
+    try {
+      setIsLoading(true);
+      const response = await axios.post(`${API_URL}/import-srt`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setTranscripts(response.data);
+      setActiveTab('transcripts');
+      await handleNGrams(1);
+    } catch (error) {
+      console.error('SRT import failed', error);
+    } finally {
+      setIsLoading(false);
+      // Reset the file input so the same file can be re-selected
+      event.target.value = '';
+    }
+  };
+
   const handleTranscribe = async () => {
     try {
       setIsLoading(true);
@@ -252,6 +277,7 @@ export function useVideoProcessing() {
     isResultContained,
     removeResult,
     handleFileUpload,
+    handleImportSRT,
     handleTranscribe,
     handleSearch,
     onDragEnd,

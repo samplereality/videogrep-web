@@ -1,9 +1,35 @@
 const path = require('path');
 const fs = require('fs');
-const upload = require('../middleware/middleware');
+const { upload, srtUpload } = require('../middleware/middleware');
 const videoController = require('../controllers/videoController');
 const clients = new Set();
 
+function parseSRT(srtContent) {
+    const segments = [];
+    const blocks = srtContent.trim().replace(/\r\n/g, '\n').split(/\n\n+/);
+
+    for (const block of blocks) {
+        const lines = block.split('\n');
+        if (lines.length < 3) continue;
+
+        const timeMatch = lines[1].match(
+            /(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/
+        );
+        if (!timeMatch) continue;
+
+        const start = parseInt(timeMatch[1]) * 3600 + parseInt(timeMatch[2]) * 60 +
+                       parseInt(timeMatch[3]) + parseInt(timeMatch[4]) / 1000;
+        const end = parseInt(timeMatch[5]) * 3600 + parseInt(timeMatch[6]) * 60 +
+                     parseInt(timeMatch[7]) + parseInt(timeMatch[8]) / 1000;
+        const text = lines.slice(2).join(' ').replace(/<[^>]+>/g, '').trim();
+
+        if (text) {
+            segments.push({ start, end, text });
+        }
+    }
+
+    return segments;
+}
 
 function sendLogToClients(log, type) {
     console.log("SENDING TO CLIENTS:", { log, type });
@@ -88,6 +114,41 @@ module.exports = function(app) {
             res.json({ success: true, output: filename, message: 'Supercut created successfully' });
         } catch (error) {
             res.status(500).json({ success: false, message: 'Export failed', error });
+        }
+    });
+
+    app.post('/import-srt', srtUpload.single('srt'), (req, res) => {
+        try {
+            const videoFile = req.body.videoFile;
+            if (!videoFile) {
+                return res.status(400).json({ error: 'No video file path specified' });
+            }
+            if (!req.file) {
+                return res.status(400).json({ error: 'No SRT file uploaded' });
+            }
+
+            const srtContent = fs.readFileSync(req.file.path, 'utf-8');
+            const segments = parseSRT(srtContent);
+            const transcriptData = segments.map(seg => ({
+                content: seg.text,
+                start: seg.start,
+                end: seg.end
+            }));
+
+            // Save as .json next to the video so videogrep can find it
+            const jsonPath = videoFile.replace(/\.[^.]+$/, '.json');
+            fs.writeFileSync(jsonPath, JSON.stringify(transcriptData, null, 2));
+
+            // Clean up the uploaded SRT file
+            fs.unlinkSync(req.file.path);
+
+            // Return in the same format as the transcribe endpoint
+            const result = {};
+            result[videoFile] = transcriptData;
+            res.json(result);
+        } catch (error) {
+            console.error('SRT import failed:', error);
+            res.status(500).json({ error: 'SRT import failed', details: error.message });
         }
     });
 
