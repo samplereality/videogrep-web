@@ -86,7 +86,9 @@ module.exports = function(app) {
             const results = await videoController.handleNgrams(files, n);
             res.json(results);
         } catch (error) {
-            res.status(500).json({ error: 'Ngrams failed', details: error });
+            console.error('Ngrams failed:', error);
+            const message = error.details || error.message || String(error);
+            res.status(500).json({ error: 'Ngrams failed', details: message });
         }
     });
 

@@ -1,8 +1,22 @@
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
+
+function getPythonCommand() {
+    for (const cmd of ['python3', 'python']) {
+        try {
+            execSync(`${cmd} --version`, { stdio: 'ignore' });
+            return cmd;
+        } catch (e) {
+            continue;
+        }
+    }
+    return 'python3';
+}
+
+const pythonCmd = getPythonCommand();
 
 function runPythonProcess(pythonScript, options = {}, onLog = null) {
     return new Promise((resolve, reject) => {
-        const process = spawn('python', ['-c', pythonScript], options);
+        const process = spawn(pythonCmd, ['-c', pythonScript], options);
         let resultData = '';
         let errorOutput = '';
 
