@@ -1,51 +1,66 @@
-# VideoGrep Web Interface
+# Videogrep Web
 
-A web interface for VideoGrep that transcribes videos, searches through transcripts, and creates supercuts based on search terms. 
-
-<img src="https://github.com/user-attachments/assets/57f25151-2282-4eaa-8e79-eb81841b3de5" alt="image" width="400" />
-
-
-
+A web GUI for searching video subtitles and creating supercuts. Uses SRT files for subtitles and ffmpeg for video processing.
 
 ## Features
 
-- Upload videos and generate transcripts
-- Search through video transcripts by words or sentences  
-- Create video supercuts from your search results
-- Analyze word frequencies with N-gram analysis
-- Real-time logs of transcription and export processes
-- Preview generated videos in browser
+- Upload multiple videos with their SRT subtitle files
+- Search across all subtitles (plain text or regex)
+- Preview matching clips in the browser
+- Select results and export a supercut video
+- Adjustable padding around clips
 
-## Installation
+## Requirements
 
-Install backend dependencies:
+- Python 3.9+
+- [ffmpeg](https://ffmpeg.org/download.html)
+
+### Installing ffmpeg
+
+**macOS:**
 ```bash
-cd backend
-npm install
+brew install ffmpeg
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update && sudo apt install ffmpeg
+```
+
+**Windows:**
+Download from https://ffmpeg.org/download.html and add to your PATH.
+
+## Setup
+
+```bash
+# Clone the repo
+git clone https://github.com/samplereality/videogrep-web.git
+cd videogrep-web
+
+# Create and activate a virtual environment
+python3 -m venv venv
+source venv/bin/activate        # macOS/Linux
+# venv\Scripts\activate         # Windows
+
+# Install dependencies
 pip install -r requirements.txt
 ```
-Set up frontend:
-```bash
-cd ../frontend
-npm install
-npm run build
-```
-Start the server:
+
+## Running
 
 ```bash
-cd ../backend
-npm start
+source venv/bin/activate        # if not already activated
+python app.py
 ```
-The application will be available at http://localhost:3000
+
+Open http://localhost:5000 in your browser.
+
+To stop the server, press `Ctrl+C` in the terminal.
 
 ## Usage
 
-1. Upload videos using the upload button
-2. Click "Transcribe" to generate transcripts for your videos
-3. Enter search terms and choose whether to search by words or sentences
-4. Click "Search" to find matching video segments
-5. Edit search results (in sentence mode) to select desired segments
-6. Click "Export Supercut" to create a video of the selected segments
-
-## License
-ISC License
+1. Click **Add Video** in the sidebar to upload a video file along with its `.srt` subtitle file
+2. Type a search query and hit **Search** (check "regex" for regular expression support)
+3. Click **Preview** on any result to watch that clip in the browser
+4. Check the clips you want, then click **Export Supercut** to download a combined video
+5. Use the **Padding** control to add extra seconds before/after each clip

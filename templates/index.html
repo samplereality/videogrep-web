@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Videogrep Web</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; }
+
+    header { background: #16213e; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid #0f3460; }
+    header h1 { font-size: 1.4rem; color: #e94560; }
+
+    .container { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 60px); }
+
+    /* Sidebar */
+    .sidebar { background: #16213e; padding: 1rem; border-right: 1px solid #0f3460; overflow-y: auto; }
+    .sidebar h2 { font-size: 1rem; margin-bottom: 0.75rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+
+    .upload-zone { border: 2px dashed #0f3460; border-radius: 8px; padding: 1.5rem; text-align: center; margin-bottom: 1rem; cursor: pointer; transition: border-color 0.2s; }
+    .upload-zone:hover { border-color: #e94560; }
+    .upload-zone p { font-size: 0.85rem; color: #888; margin-top: 0.5rem; }
+
+    .upload-form { display: none; margin-bottom: 1rem; }
+    .upload-form.active { display: block; }
+    .upload-form label { display: block; font-size: 0.85rem; color: #aaa; margin: 0.5rem 0 0.25rem; }
+    .upload-form input[type="file"] { width: 100%; font-size: 0.85rem; }
+
+    .video-list { list-style: none; }
+    .video-item { padding: 0.6rem 0.75rem; margin-bottom: 0.25rem; border-radius: 6px; background: #1a1a2e; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; cursor: default; }
+    .video-item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .video-item .count { color: #888; font-size: 0.8rem; margin-left: 0.5rem; white-space: nowrap; }
+    .video-item .delete-btn { background: none; border: none; color: #666; cursor: pointer; font-size: 1rem; padding: 0 0.25rem; }
+    .video-item .delete-btn:hover { color: #e94560; }
+
+    /* Main area */
+    .main { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+
+    .search-bar { display: flex; gap: 0.5rem; }
+    .search-bar input[type="text"] { flex: 1; padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid #0f3460; background: #16213e; color: #eee; font-size: 1rem; outline: none; }
+    .search-bar input[type="text"]:focus { border-color: #e94560; }
+    .search-bar label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; color: #aaa; white-space: nowrap; }
+
+    button { padding: 0.6rem 1.2rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 600; }
+    .btn-primary { background: #e94560; color: #fff; }
+    .btn-primary:hover { background: #c73550; }
+    .btn-primary:disabled { background: #555; cursor: not-allowed; }
+    .btn-secondary { background: #0f3460; color: #eee; }
+    .btn-secondary:hover { background: #1a4a8a; }
+
+    /* Results */
+    .results-header { display: flex; justify-content: space-between; align-items: center; }
+    .results-header span { color: #888; font-size: 0.9rem; }
+
+    .results-actions { display: flex; gap: 0.5rem; align-items: center; }
+    .results-actions span { font-size: 0.85rem; color: #aaa; }
+
+    .results { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem; }
+
+    .result-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: #16213e; cursor: pointer; transition: background 0.15s; }
+    .result-row:hover { background: #1e2d50; }
+    .result-row.selected { background: #1e2d50; outline: 1px solid #e94560; }
+    .result-row input[type="checkbox"] { flex-shrink: 0; accent-color: #e94560; }
+    .result-row .time { color: #e94560; font-family: monospace; font-size: 0.85rem; white-space: nowrap; min-width: 100px; }
+    .result-row .text { flex: 1; font-size: 0.9rem; }
+    .result-row .text mark { background: #e9456044; color: #fff; padding: 0 2px; border-radius: 2px; }
+    .result-row .video-tag { font-size: 0.75rem; background: #0f3460; padding: 2px 6px; border-radius: 4px; color: #aaa; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+    .result-row .preview-btn { background: none; border: 1px solid #0f3460; color: #aaa; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; white-space: nowrap; }
+    .result-row .preview-btn:hover { border-color: #e94560; color: #e94560; }
+
+    /* Preview panel */
+    .preview-panel { background: #16213e; border-radius: 8px; padding: 1rem; }
+    .preview-panel video { width: 100%; max-height: 300px; border-radius: 6px; background: #000; }
+    .preview-panel p { font-size: 0.85rem; color: #aaa; margin-top: 0.5rem; text-align: center; }
+
+    /* Padding input */
+    .export-options { display: flex; align-items: center; gap: 0.75rem; }
+    .export-options label { font-size: 0.85rem; color: #aaa; }
+    .export-options input[type="number"] { width: 60px; padding: 0.3rem 0.5rem; border-radius: 4px; border: 1px solid #0f3460; background: #1a1a2e; color: #eee; font-size: 0.85rem; }
+
+    /* Status bar */
+    .status { padding: 0.5rem 1rem; font-size: 0.85rem; color: #888; min-height: 2rem; }
+    .status.error { color: #e94560; }
+    .status.success { color: #4ecdc4; }
+
+    /* Empty state */
+    .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: #555; gap: 0.5rem; }
+    .empty p { font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Videogrep Web</h1>
+</header>
+
+<div class="container">
+  <aside class="sidebar">
+    <h2>Videos</h2>
+
+    <div class="upload-zone" id="uploadZone" onclick="toggleUploadForm()">
+      <strong>+ Add Video</strong>
+      <p>Upload a video with its .srt file</p>
+    </div>
+
+    <div class="upload-form" id="uploadForm">
+      <label>Video file:</label>
+      <input type="file" id="videoFile" accept="video/*">
+      <label>SRT file:</label>
+      <input type="file" id="srtFile" accept=".srt">
+      <br><br>
+      <button class="btn-primary" onclick="uploadFiles()" id="uploadBtn">Upload</button>
+      <button class="btn-secondary" onclick="toggleUploadForm()">Cancel</button>
+    </div>
+
+    <ul class="video-list" id="videoList"></ul>
+  </aside>
+
+  <main class="main">
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Search subtitles..." onkeydown="if(event.key==='Enter') doSearch()">
+      <label><input type="checkbox" id="regexToggle"> regex</label>
+      <button class="btn-primary" onclick="doSearch()">Search</button>
+    </div>
+
+    <div class="preview-panel" id="previewPanel" style="display:none;">
+      <video id="previewVideo" controls></video>
+      <p id="previewText"></p>
+    </div>
+
+    <div class="results-header" id="resultsHeader" style="display:none;">
+      <span id="resultCount"></span>
+      <div class="results-actions">
+        <button class="btn-secondary" onclick="selectAll()">Select All</button>
+        <button class="btn-secondary" onclick="selectNone()">Select None</button>
+        <div class="export-options">
+          <label>Padding (s):</label>
+          <input type="number" id="paddingInput" value="0" min="0" max="5" step="0.1">
+        </div>
+        <button class="btn-primary" onclick="exportSupercut()" id="exportBtn">Export Supercut</button>
+      </div>
+    </div>
+
+    <div class="results" id="results">
+      <div class="empty" id="emptyState">
+        <p>Upload videos and search subtitles to get started</p>
+      </div>
+    </div>
+
+    <div class="status" id="status"></div>
+  </main>
+</div>
+
+<script>
+const state = {
+  videos: [],
+  results: [],
+  selected: new Set(),
+};
+
+function toggleUploadForm() {
+  document.getElementById('uploadForm').classList.toggle('active');
+}
+
+async function uploadFiles() {
+  const videoFile = document.getElementById('videoFile').files[0];
+  const srtFile = document.getElementById('srtFile').files[0];
+  if (!videoFile || !srtFile) {
+    setStatus('Please select both a video and an SRT file', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('uploadBtn');
+  btn.disabled = true;
+  btn.textContent = 'Uploading...';
+  setStatus('Uploading files...');
+
+  const form = new FormData();
+  form.append('video', videoFile);
+  form.append('srt', srtFile);
+
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    setStatus(`Uploaded "${data.name}" with ${data.subtitle_count} subtitles`, 'success');
+    toggleUploadForm();
+    document.getElementById('videoFile').value = '';
+    document.getElementById('srtFile').value = '';
+    loadVideos();
+  } catch (e) {
+    setStatus('Upload failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Upload';
+  }
+}
+
+async function loadVideos() {
+  const res = await fetch('/api/videos');
+  state.videos = await res.json();
+  renderVideoList();
+}
+
+function renderVideoList() {
+  const list = document.getElementById('videoList');
+  list.innerHTML = '';
+  for (const v of state.videos) {
+    const li = document.createElement('li');
+    li.className = 'video-item';
+    li.innerHTML = `
+      <span class="name" title="${v.name}">${v.name}</span>
+      <span class="count">${v.subtitle_count} subs</span>
+      <button class="delete-btn" title="Remove" onclick="deleteVideo('${v.id}')">&times;</button>
+    `;
+    list.appendChild(li);
+  }
+}
+
+async function deleteVideo(id) {
+  if (!confirm('Remove this video?')) return;
+  await fetch(`/api/videos/${id}`, { method: 'DELETE' });
+  loadVideos();
+}
+
+async function doSearch() {
+  const query = document.getElementById('searchInput').value.trim();
+  if (!query) return;
+  const regex = document.getElementById('regexToggle').checked;
+
+  setStatus('Searching...');
+  const params = new URLSearchParams({ q: query, regex: regex });
+  const res = await fetch('/api/search?' + params);
+  const data = await res.json();
+  if (!res.ok) {
+    setStatus(data.error, 'error');
+    return;
+  }
+
+  state.results = data.results;
+  state.selected.clear();
+  setStatus(`Found ${data.count} results`, 'success');
+  renderResults(query, regex);
+}
+
+function renderResults(query, isRegex) {
+  const container = document.getElementById('results');
+  const header = document.getElementById('resultsHeader');
+  const empty = document.getElementById('emptyState');
+
+  if (state.results.length === 0) {
+    container.innerHTML = '';
+    header.style.display = 'none';
+    container.appendChild(empty);
+    empty.querySelector('p').textContent = 'No results found';
+    return;
+  }
+
+  empty.style.display = 'none';
+  header.style.display = 'flex';
+  document.getElementById('resultCount').textContent = `${state.results.length} results`;
+
+  container.innerHTML = '';
+  state.results.forEach((r, i) => {
+    const row = document.createElement('div');
+    row.className = 'result-row';
+    row.dataset.index = i;
+
+    const highlighted = highlightText(r.text, query, isRegex);
+    const startShort = r.start.substring(0, 8);
+    const endShort = r.end.substring(0, 8);
+
+    row.innerHTML = `
+      <input type="checkbox" onchange="toggleSelect(${i}, this.checked)" />
+      <span class="time">${startShort} - ${endShort}</span>
+      <span class="text">${highlighted}</span>
+      <span class="video-tag" title="${r.video_name}">${r.video_name}</span>
+      <button class="preview-btn" onclick="previewClip('${r.video_id}', ${r.start_seconds}, ${r.end_seconds}, '${escapeHtml(r.text)}'); event.stopPropagation();">Preview</button>
+    `;
+
+    row.addEventListener('click', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+      const cb = row.querySelector('input[type="checkbox"]');
+      cb.checked = !cb.checked;
+      toggleSelect(i, cb.checked);
+    });
+
+    container.appendChild(row);
+  });
+}
+
+function highlightText(text, query, isRegex) {
+  try {
+    const pattern = isRegex ? new RegExp(`(${query})`, 'gi') : new RegExp(`(${escapeRegex(query)})`, 'gi');
+    return text.replace(pattern, '<mark>$1</mark>');
+  } catch {
+    return escapeHtml(text);
+  }
+}
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function toggleSelect(index, checked) {
+  if (checked) state.selected.add(index);
+  else state.selected.delete(index);
+
+  const row = document.querySelector(`.result-row[data-index="${index}"]`);
+  if (row) row.classList.toggle('selected', checked);
+
+  updateSelectedCount();
+}
+
+function selectAll() {
+  state.results.forEach((_, i) => state.selected.add(i));
+  document.querySelectorAll('.result-row input[type="checkbox"]').forEach(cb => cb.checked = true);
+  document.querySelectorAll('.result-row').forEach(r => r.classList.add('selected'));
+  updateSelectedCount();
+}
+
+function selectNone() {
+  state.selected.clear();
+  document.querySelectorAll('.result-row input[type="checkbox"]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('.result-row').forEach(r => r.classList.remove('selected'));
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  const btn = document.getElementById('exportBtn');
+  const n = state.selected.size;
+  btn.textContent = n > 0 ? `Export Supercut (${n})` : 'Export Supercut';
+  btn.disabled = n === 0;
+}
+
+let previewTimer = null;
+function previewClip(videoId, startSeconds, endSeconds, text) {
+  const panel = document.getElementById('previewPanel');
+  const video = document.getElementById('previewVideo');
+  const textEl = document.getElementById('previewText');
+
+  panel.style.display = 'block';
+  textEl.textContent = text;
+
+  const src = `/api/video/${videoId}/stream`;
+  if (video.dataset.src !== src) {
+    video.src = src;
+    video.dataset.src = src;
+  }
+  video.currentTime = startSeconds;
+
+  if (previewTimer) clearInterval(previewTimer);
+  video.play();
+  previewTimer = setInterval(() => {
+    if (video.currentTime >= endSeconds) {
+      video.pause();
+      clearInterval(previewTimer);
+    }
+  }, 100);
+}
+
+async function exportSupercut() {
+  if (state.selected.size === 0) return;
+
+  const clips = Array.from(state.selected)
+    .sort((a, b) => a - b)
+    .map(i => state.results[i])
+    .map(r => ({ video_id: r.video_id, start_seconds: r.start_seconds, end_seconds: r.end_seconds }));
+
+  const padding = parseFloat(document.getElementById('paddingInput').value) || 0;
+
+  const btn = document.getElementById('exportBtn');
+  btn.disabled = true;
+  btn.textContent = 'Exporting...';
+  setStatus('Building supercut... this may take a moment');
+
+  try {
+    const res = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clips, padding }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    setStatus('Supercut ready! Downloading...', 'success');
+    const a = document.createElement('a');
+    a.href = `/api/export/${data.filename}`;
+    a.download = data.filename;
+    a.click();
+  } catch (e) {
+    setStatus('Export failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    updateSelectedCount();
+  }
+}
+
+function setStatus(msg, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+// Init
+loadVideos();
+updateSelectedCount();
+</script>
+
+</body>
+</html>

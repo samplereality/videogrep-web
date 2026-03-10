@@ -1,5 +1,7 @@
 .env
 *.mp4
 node_modules
-uploads
-OLDSERVER
+__pycache__/
+*.pyc
+uploads/
+exports/
