@@ -1,4 +1,0 @@
-videogrep
-vosk
-# torch
-# transformers
