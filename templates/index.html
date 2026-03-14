@@ -6,15 +6,17 @@
   <title>Videogrep Web</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; }
+    html, body { height: 100%; overflow: hidden; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #eee; }
 
     header { background: #16213e; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid #0f3460; }
     header h1 { font-size: 1.4rem; color: #e94560; }
 
-    .container { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 60px); }
+    .container { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 60px); }
 
     /* Sidebar */
-    .sidebar { background: #16213e; padding: 1rem; border-right: 1px solid #0f3460; overflow-y: auto; }
+    .sidebar { background: #16213e; padding: 0; border-right: 1px solid #0f3460; height: 100%; display: flex; flex-direction: column; }
+    .sidebar-content { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem; }
     .sidebar h2 { font-size: 1rem; margin-bottom: 0.75rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
 
     .upload-zone { border: 2px dashed #0f3460; border-radius: 8px; padding: 1.5rem; text-align: center; margin-bottom: 1rem; cursor: pointer; transition: border-color 0.2s; }
@@ -25,21 +27,36 @@
     .upload-form.active { display: block; }
     .upload-form label { display: block; font-size: 0.85rem; color: #aaa; margin: 0.5rem 0 0.25rem; }
     .upload-form input[type="file"] { width: 100%; font-size: 0.85rem; }
+    .upload-form .subtitle-note { font-size: 0.75rem; color: #666; margin-top: 0.2rem; }
 
     .video-list { list-style: none; }
-    .video-item { padding: 0.6rem 0.75rem; margin-bottom: 0.25rem; border-radius: 6px; background: #1a1a2e; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; cursor: default; }
+    .video-item { padding: 0.5rem 0.75rem; margin-bottom: 0.25rem; border-radius: 6px; background: #1a1a2e; font-size: 0.9rem; cursor: default; }
+    .video-item-header { display: flex; justify-content: space-between; align-items: center; }
     .video-item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
     .video-item .count { color: #888; font-size: 0.8rem; margin-left: 0.5rem; white-space: nowrap; }
-    .video-item .delete-btn { background: none; border: none; color: #666; cursor: pointer; font-size: 1rem; padding: 0 0.25rem; }
-    .video-item .delete-btn:hover { color: #e94560; }
+    .video-item .word-badge { font-size: 0.7rem; background: #0f3460; color: #4ecdc4; padding: 1px 5px; border-radius: 3px; margin-left: 0.3rem; white-space: nowrap; }
+    .video-item .delete-btn { background: none; border: 1px solid #3a2030; color: #c05070; cursor: pointer; font-size: 0.75rem; padding: 0.15rem 0.4rem; border-radius: 4px; white-space: nowrap; }
+    .video-item .delete-btn:hover { background: #e94560; border-color: #e94560; color: #fff; }
+    .video-item-controls { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.35rem; font-size: 0.8rem; }
+    .video-item-controls label { color: #888; }
+    .video-item-controls input[type="number"] { width: 65px; padding: 0.15rem 0.3rem; border-radius: 4px; border: 1px solid #0f3460; background: #16213e; color: #eee; font-size: 0.8rem; }
+    .video-item .transcribe-btn { background: #0f3460; border: none; color: #4ecdc4; cursor: pointer; font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px; }
+    .video-item .transcribe-btn:hover { background: #1a4a8a; }
+    .video-item .transcribe-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     /* Main area */
-    .main { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+    .main { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; overflow: hidden; min-height: 0; }
 
-    .search-bar { display: flex; gap: 0.5rem; }
-    .search-bar input[type="text"] { flex: 1; padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid #0f3460; background: #16213e; color: #eee; font-size: 1rem; outline: none; }
+    .search-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+    .search-bar input[type="text"] { flex: 1; min-width: 120px; padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid #0f3460; background: #16213e; color: #eee; font-size: 1rem; outline: none; }
     .search-bar input[type="text"]:focus { border-color: #e94560; }
+    .search-bar input[type="text"].exclude-input { border-color: #5a2a3a; }
+    .search-bar input[type="text"].exclude-input:focus { border-color: #e94560; }
     .search-bar label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; color: #aaa; white-space: nowrap; }
+    .search-label { font-size: 0.8rem; color: #888; align-self: center; white-space: nowrap; }
+    .search-bar input[type="number"] { width: 55px; padding: 0.5rem 0.4rem; border-radius: 6px; border: 1px solid #0f3460; background: #16213e; color: #eee; font-size: 0.85rem; outline: none; }
+
+    .search-bar select { background: #16213e; color: #eee; border: 1px solid #0f3460; border-radius: 6px; padding: 0.5rem 0.6rem; font-size: 0.85rem; cursor: pointer; }
 
     button { padding: 0.6rem 1.2rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 600; }
     .btn-primary { background: #e94560; color: #fff; }
@@ -49,10 +66,10 @@
     .btn-secondary:hover { background: #1a4a8a; }
 
     /* Results */
-    .results-header { display: flex; justify-content: space-between; align-items: center; }
+    .results-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
     .results-header span { color: #888; font-size: 0.9rem; }
 
-    .results-actions { display: flex; gap: 0.5rem; align-items: center; }
+    .results-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
     .results-actions span { font-size: 0.85rem; color: #aaa; }
 
     .results { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem; }
@@ -60,23 +77,31 @@
     .result-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: #16213e; cursor: pointer; transition: background 0.15s; }
     .result-row:hover { background: #1e2d50; }
     .result-row.selected { background: #1e2d50; outline: 1px solid #e94560; }
+    .result-row.drag-over { border-top: 2px solid #e94560; }
+    .result-row.dragging { opacity: 0.4; }
+    .result-row .drag-handle { cursor: grab; color: #555; font-size: 1rem; padding: 0 0.25rem; user-select: none; flex-shrink: 0; }
+    .result-row .drag-handle:active { cursor: grabbing; }
     .result-row input[type="checkbox"] { flex-shrink: 0; accent-color: #e94560; }
     .result-row .time { color: #e94560; font-family: monospace; font-size: 0.85rem; white-space: nowrap; min-width: 100px; }
     .result-row .text { flex: 1; font-size: 0.9rem; }
     .result-row .text mark { background: #e9456044; color: #fff; padding: 0 2px; border-radius: 2px; }
     .result-row .video-tag { font-size: 0.75rem; background: #0f3460; padding: 2px 6px; border-radius: 4px; color: #aaa; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
-    .result-row .preview-btn { background: none; border: 1px solid #0f3460; color: #aaa; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; white-space: nowrap; }
-    .result-row .preview-btn:hover { border-color: #e94560; color: #e94560; }
+    .result-row .preview-btn, .result-row .edit-btn { background: none; border: 1px solid #0f3460; color: #aaa; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; white-space: nowrap; }
+    .result-row .preview-btn:hover, .result-row .edit-btn:hover { border-color: #e94560; color: #e94560; }
+    .result-row .text-edit { flex: 1; font-size: 0.9rem; padding: 0.3rem 0.5rem; border-radius: 4px; border: 1px solid #e94560; background: #1a1a2e; color: #eee; outline: none; font-family: inherit; }
+    .result-row .text.edited { color: #4ecdc4; }
 
     /* Preview panel */
-    .preview-panel { background: #16213e; border-radius: 8px; padding: 1rem; }
-    .preview-panel video { width: 100%; max-height: 300px; border-radius: 6px; background: #000; }
-    .preview-panel p { font-size: 0.85rem; color: #aaa; margin-top: 0.5rem; text-align: center; }
+    .preview-panel { background: #16213e; border-bottom: 1px solid #0f3460; padding: 0.75rem; flex-shrink: 0; }
+    .preview-panel video { width: 100%; max-height: 220px; border-radius: 6px; background: #000; display: block; }
+    .preview-panel p { font-size: 0.8rem; color: #aaa; margin-top: 0.4rem; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .preview-panel .preview-progress { font-size: 0.75rem; color: #4ecdc4; text-align: center; margin-top: 0.25rem; }
 
-    /* Padding input */
+    /* Export options */
     .export-options { display: flex; align-items: center; gap: 0.75rem; }
     .export-options label { font-size: 0.85rem; color: #aaa; }
     .export-options input[type="number"] { width: 60px; padding: 0.3rem 0.5rem; border-radius: 4px; border: 1px solid #0f3460; background: #1a1a2e; color: #eee; font-size: 0.85rem; }
+    .export-options select { background: #1a1a2e; color: #eee; border: 1px solid #0f3460; border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.85rem; cursor: pointer; }
 
     /* Status bar */
     .status { padding: 0.5rem 1rem; font-size: 0.85rem; color: #888; min-height: 2rem; }
@@ -86,6 +111,23 @@
     /* Empty state */
     .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: #555; gap: 0.5rem; }
     .empty p { font-size: 1.1rem; }
+
+    /* N-grams modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: #16213e; border: 1px solid #0f3460; border-radius: 12px; padding: 1.5rem; width: 520px; max-height: 70vh; display: flex; flex-direction: column; }
+    .modal h2 { font-size: 1.1rem; color: #e94560; margin-bottom: 1rem; }
+    .modal-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .modal-tabs button { padding: 0.35rem 0.8rem; border-radius: 4px; border: 1px solid #0f3460; background: transparent; color: #aaa; cursor: pointer; font-size: 0.85rem; }
+    .modal-tabs button.active { background: #0f3460; color: #fff; }
+    .modal-body { flex: 1; overflow-y: auto; }
+    .modal-close { position: absolute; top: 0.75rem; right: 1rem; background: none; border: none; color: #888; font-size: 1.2rem; cursor: pointer; }
+    .ngram-list { list-style: none; }
+    .ngram-item { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; border-radius: 4px; cursor: pointer; transition: background 0.15s; }
+    .ngram-item:hover { background: #1a1a2e; }
+    .ngram-item .word { color: #eee; }
+    .ngram-item .freq { color: #888; font-size: 0.85rem; font-family: monospace; }
+    .ngram-bar { height: 3px; background: #e94560; border-radius: 2px; margin-top: 2px; transition: width 0.3s; }
   </style>
 </head>
 <body>
@@ -96,36 +138,55 @@
 
 <div class="container">
   <aside class="sidebar">
-    <h2>Videos</h2>
-
-    <div class="upload-zone" id="uploadZone" onclick="toggleUploadForm()">
-      <strong>+ Add Video</strong>
-      <p>Upload a video with its .srt file</p>
+    <div class="preview-panel" id="previewPanel" style="display:none;">
+      <video id="previewVideo" controls></video>
+      <p id="previewText"></p>
+      <div class="preview-progress" id="previewProgress"></div>
     </div>
 
-    <div class="upload-form" id="uploadForm">
-      <label>Video file:</label>
-      <input type="file" id="videoFile" accept="video/*">
-      <label>SRT file:</label>
-      <input type="file" id="srtFile" accept=".srt">
-      <br><br>
-      <button class="btn-primary" onclick="uploadFiles()" id="uploadBtn">Upload</button>
-      <button class="btn-secondary" onclick="toggleUploadForm()">Cancel</button>
-    </div>
+    <div class="sidebar-content">
+      <h2>Videos</h2>
 
-    <ul class="video-list" id="videoList"></ul>
+      <div class="upload-zone" id="uploadZone" onclick="toggleUploadForm()">
+        <strong>+ Add Video</strong>
+        <p>Upload a video with its subtitle file</p>
+      </div>
+
+      <div class="upload-form" id="uploadForm">
+        <label>Video file:</label>
+        <input type="file" id="videoFile" accept="video/*">
+        <label>Subtitle file (.srt or .vtt):</label>
+        <input type="file" id="srtFile" accept=".srt,.vtt">
+        <p class="subtitle-note" id="subtitleNote" style="display:none;">Optional if Whisper is available for auto-transcription</p>
+        <br>
+        <button class="btn-primary" onclick="uploadFiles()" id="uploadBtn">Upload</button>
+        <button class="btn-secondary" onclick="toggleUploadForm()">Cancel</button>
+      </div>
+
+      <ul class="video-list" id="videoList"></ul>
+    </div>
   </aside>
 
   <main class="main">
     <div class="search-bar">
-      <input type="text" id="searchInput" placeholder="Search subtitles..." onkeydown="if(event.key==='Enter') doSearch()">
+      <span class="search-label">Include:</span>
+      <input type="text" id="searchInput" placeholder="Search subtitles (comma for multiple)..." onkeydown="if(event.key==='Enter') doSearch()">
+      <span class="search-label">Exclude:</span>
+      <input type="text" id="excludeInput" class="exclude-input" placeholder="Exclude..." onkeydown="if(event.key==='Enter') doSearch()">
       <label><input type="checkbox" id="regexToggle"> regex</label>
+      <select id="searchType">
+        <option value="sentence">sentence</option>
+        <option value="fragment">fragment</option>
+      </select>
+      <select id="searchMode">
+        <option value="any">any term</option>
+        <option value="all">all terms</option>
+      </select>
+      <span class="search-label">Max:</span>
+      <input type="number" id="maxResults" value="0" min="0" step="10" title="0 = no limit">
       <button class="btn-primary" onclick="doSearch()">Search</button>
-    </div>
-
-    <div class="preview-panel" id="previewPanel" style="display:none;">
-      <video id="previewVideo" controls></video>
-      <p id="previewText"></p>
+      <button class="btn-secondary" onclick="clearSearch()">Clear</button>
+      <button class="btn-secondary" onclick="openNgrams()">Explore Words</button>
     </div>
 
     <div class="results-header" id="resultsHeader" style="display:none;">
@@ -134,10 +195,20 @@
         <button class="btn-secondary" onclick="selectAll()">Select All</button>
         <button class="btn-secondary" onclick="selectNone()">Select None</button>
         <div class="export-options">
-          <label>Padding (s):</label>
+          <label>Padding:</label>
           <input type="number" id="paddingInput" value="0" min="0" max="5" step="0.1">
+          <label title="Randomize clip order before export"><input type="checkbox" id="shuffleToggle"> Shuffle</label>
+          <label title="Burn subtitle text into video"><input type="checkbox" id="burnSubsToggle"> Burn subs</label>
+          <label>Format:</label>
+          <select id="exportFormat">
+            <option value="supercut">Supercut (.mp4)</option>
+            <option value="clips">Individual Clips (.zip)</option>
+            <option value="edl">EDL (.edl)</option>
+            <option value="fcpxml">FCPXML (.fcpxml)</option>
+          </select>
         </div>
-        <button class="btn-primary" onclick="exportSupercut()" id="exportBtn">Export Supercut</button>
+        <button class="btn-primary" onclick="doExport()" id="exportBtn">Export</button>
+        <button class="btn-secondary" onclick="previewAllSelected()" id="previewAllBtn" title="Preview all selected clips in sequence">Preview Selected</button>
       </div>
     </div>
 
@@ -151,12 +222,48 @@
   </main>
 </div>
 
+<!-- N-grams modal -->
+<div class="modal-overlay" id="ngramModal">
+  <div class="modal" style="position:relative;">
+    <button class="modal-close" onclick="closeNgrams()">&times;</button>
+    <h2>Word Frequency Explorer</h2>
+    <div class="modal-tabs" id="ngramTabs">
+      <button class="active" onclick="loadNgrams(1)">Words</button>
+      <button onclick="loadNgrams(2)">2-grams</button>
+      <button onclick="loadNgrams(3)">3-grams</button>
+    </div>
+    <div class="modal-body">
+      <ul class="ngram-list" id="ngramList"></ul>
+    </div>
+  </div>
+</div>
+
 <script>
 const state = {
   videos: [],
   results: [],
   selected: new Set(),
+  whisperAvailable: false,
 };
+
+const emptyState = document.getElementById('emptyState');
+
+// Check server capabilities on load
+(async function checkCapabilities() {
+  try {
+    const res = await fetch('/api/capabilities');
+    const data = await res.json();
+    state.whisperAvailable = data.whisper;
+    state.burnSubsAvailable = data.burn_subtitles;
+    if (data.whisper) {
+      document.getElementById('subtitleNote').style.display = 'block';
+    }
+    if (!data.burn_subtitles) {
+      const burnLabel = document.getElementById('burnSubsToggle').parentElement;
+      burnLabel.title = 'Subtitles will be embedded as a soft track (install ffmpeg with libfreetype to burn into video)';
+    }
+  } catch (e) { /* ignore */ }
+})();
 
 function toggleUploadForm() {
   document.getElementById('uploadForm').classList.toggle('active');
@@ -165,8 +272,12 @@ function toggleUploadForm() {
 async function uploadFiles() {
   const videoFile = document.getElementById('videoFile').files[0];
   const srtFile = document.getElementById('srtFile').files[0];
-  if (!videoFile || !srtFile) {
-    setStatus('Please select both a video and an SRT file', 'error');
+  if (!videoFile) {
+    setStatus('Please select a video file', 'error');
+    return;
+  }
+  if (!srtFile && !state.whisperAvailable) {
+    setStatus('Please select a subtitle file (or install Whisper for auto-transcription)', 'error');
     return;
   }
 
@@ -177,13 +288,16 @@ async function uploadFiles() {
 
   const form = new FormData();
   form.append('video', videoFile);
-  form.append('srt', srtFile);
+  if (srtFile) form.append('srt', srtFile);
 
   try {
     const res = await fetch('/api/upload', { method: 'POST', body: form });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
-    setStatus(`Uploaded "${data.name}" with ${data.subtitle_count} subtitles`, 'success');
+    let msg = `Uploaded "${data.name}"`;
+    if (data.subtitle_count > 0) msg += ` with ${data.subtitle_count} subtitles`;
+    else if (data.needs_transcription) msg += ' (needs transcription)';
+    setStatus(msg, 'success');
     toggleUploadForm();
     document.getElementById('videoFile').value = '';
     document.getElementById('srtFile').value = '';
@@ -208,10 +322,30 @@ function renderVideoList() {
   for (const v of state.videos) {
     const li = document.createElement('li');
     li.className = 'video-item';
+
+    const needsTranscribe = v.needs_transcription;
+    const transcribeBtn = needsTranscribe && state.whisperAvailable
+      ? `<button class="transcribe-btn" onclick="transcribeVideo('${v.id}', this); event.stopPropagation();">Transcribe</button>`
+      : '';
+    const noSubsNote = needsTranscribe && !state.whisperAvailable
+      ? '<span style="color:#e94560;font-size:0.75rem;">No subtitles</span>'
+      : '';
+
     li.innerHTML = `
-      <span class="name" title="${v.name}">${v.name}</span>
-      <span class="count">${v.subtitle_count} subs</span>
-      <button class="delete-btn" title="Remove" onclick="deleteVideo('${v.id}')">&times;</button>
+      <div class="video-item-header">
+        <span class="name" title="${v.name}">${v.name}</span>
+        <span class="count">${v.subtitle_count} subs</span>
+        ${v.word_level ? '<span class="word-badge">word-level</span>' : ''}
+        ${transcribeBtn}
+        ${noSubsNote}
+        <button class="delete-btn" title="Delete video and transcript" onclick="deleteVideo('${v.id}')">Delete</button>
+      </div>
+      <div class="video-item-controls">
+        <label>Offset:</label>
+        <input type="number" value="${v.offset || 0}" step="0.1" title="Shift subtitles by N seconds"
+          onchange="setOffset('${v.id}', this.value)">
+        <span style="color:#666;">s</span>
+      </div>
     `;
     list.appendChild(li);
   }
@@ -223,13 +357,54 @@ async function deleteVideo(id) {
   loadVideos();
 }
 
+async function setOffset(videoId, value) {
+  const offset = parseFloat(value) || 0;
+  await fetch(`/api/videos/${videoId}/offset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ offset }),
+  });
+}
+
+async function transcribeVideo(videoId, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Transcribing...';
+  setStatus('Transcribing video with Whisper... this may take a while');
+
+  try {
+    const res = await fetch(`/api/transcribe/${videoId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'base' }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    setStatus(`Transcription complete: ${data.subtitle_count} subtitles`, 'success');
+    loadVideos();
+  } catch (e) {
+    setStatus('Transcription failed: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Transcribe';
+  }
+}
+
+// -----------------------------------------------------------------------
+// Search
+// -----------------------------------------------------------------------
 async function doSearch() {
   const query = document.getElementById('searchInput').value.trim();
   if (!query) return;
+  const exclude = document.getElementById('excludeInput').value.trim();
   const regex = document.getElementById('regexToggle').checked;
+  const searchType = document.getElementById('searchType').value;
+  const mode = document.getElementById('searchMode').value;
+  const limit = parseInt(document.getElementById('maxResults').value) || 0;
 
   setStatus('Searching...');
-  const params = new URLSearchParams({ q: query, regex: regex });
+  const params = new URLSearchParams({ q: query, regex, type: searchType, mode });
+  if (exclude) params.set('exclude', exclude);
+  if (limit > 0) params.set('limit', limit);
+
   const res = await fetch('/api/search?' + params);
   const data = await res.json();
   if (!res.ok) {
@@ -239,24 +414,50 @@ async function doSearch() {
 
   state.results = data.results;
   state.selected.clear();
-  setStatus(`Found ${data.count} results`, 'success');
+  const excludeNote = exclude ? ` (excluding "${exclude}")` : '';
+  const modeNote = data.terms && data.terms.length > 1 ? ` [${mode}]` : '';
+  setStatus(`Found ${data.count} results [${searchType}]${modeNote}${excludeNote}`, 'success');
   renderResults(query, regex);
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('excludeInput').value = '';
+  state.results = [];
+  state.selected.clear();
+  document.getElementById('resultsHeader').style.display = 'none';
+  stopPreviewAll();
+  document.getElementById('previewPanel').style.display = 'none';
+  const video = document.getElementById('previewVideo');
+  video.onloadedmetadata = null;
+  video.onseeked = null;
+  video.pause();
+  video.src = '';
+  video.dataset.src = '';
+  emptyState.querySelector('p').textContent = 'Upload videos and search subtitles to get started';
+  emptyState.style.display = '';
+  const container = document.getElementById('results');
+  container.innerHTML = '';
+  container.appendChild(emptyState);
+  setStatus('');
+  updateSelectedCount();
+  document.getElementById('searchInput').focus();
 }
 
 function renderResults(query, isRegex) {
   const container = document.getElementById('results');
   const header = document.getElementById('resultsHeader');
-  const empty = document.getElementById('emptyState');
 
   if (state.results.length === 0) {
+    emptyState.querySelector('p').textContent = 'No results found';
+    emptyState.style.display = '';
     container.innerHTML = '';
     header.style.display = 'none';
-    container.appendChild(empty);
-    empty.querySelector('p').textContent = 'No results found';
+    container.appendChild(emptyState);
     return;
   }
 
-  empty.style.display = 'none';
+  emptyState.style.display = 'none';
   header.style.display = 'flex';
   document.getElementById('resultCount').textContent = `${state.results.length} results`;
 
@@ -270,16 +471,43 @@ function renderResults(query, isRegex) {
     const startShort = r.start.substring(0, 8);
     const endShort = r.end.substring(0, 8);
 
+    const editedClass = r._edited ? ' edited' : '';
     row.innerHTML = `
+      <span class="drag-handle" title="Drag to reorder">&#9776;</span>
       <input type="checkbox" onchange="toggleSelect(${i}, this.checked)" />
       <span class="time">${startShort} - ${endShort}</span>
-      <span class="text">${highlighted}</span>
+      <span class="text${editedClass}" data-index="${i}">${highlighted}</span>
       <span class="video-tag" title="${r.video_name}">${r.video_name}</span>
-      <button class="preview-btn" onclick="previewClip('${r.video_id}', ${r.start_seconds}, ${r.end_seconds}, '${escapeHtml(r.text)}'); event.stopPropagation();">Preview</button>
+      <button class="edit-btn" onclick="editSubtitle(${i}, this); event.stopPropagation();">Edit</button>
+      <button class="preview-btn" onclick="previewByIndex(${i}); event.stopPropagation();">Preview</button>
     `;
 
+    // Drag-and-drop reordering — only allow drag from the handle
+    row.draggable = false;
+    const handle = row.querySelector('.drag-handle');
+    handle.addEventListener('mousedown', () => { row.draggable = true; });
+    row.addEventListener('dragstart', (e) => {
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', i.toString());
+    });
+    row.addEventListener('dragend', () => { row.classList.remove('dragging'); row.draggable = false; });
+    row.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      row.classList.add('drag-over');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+    row.addEventListener('drop', (e) => {
+      e.preventDefault();
+      row.classList.remove('drag-over');
+      const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+      const toIndex = parseInt(row.dataset.index);
+      if (fromIndex !== toIndex) reorderResult(fromIndex, toIndex);
+    });
+
     row.addEventListener('click', (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.classList.contains('drag-handle')) return;
       const cb = row.querySelector('input[type="checkbox"]');
       cb.checked = !cb.checked;
       toggleSelect(i, cb.checked);
@@ -289,9 +517,56 @@ function renderResults(query, isRegex) {
   });
 }
 
+function reorderResult(fromIndex, toIndex) {
+  // Move item in state.results array
+  const [item] = state.results.splice(fromIndex, 1);
+  state.results.splice(toIndex, 0, item);
+
+  // Rebuild selected set with updated indices
+  const newSelected = new Set();
+  const oldSelected = state.selected;
+
+  // Map old indices to new indices after the move
+  for (const oldIdx of oldSelected) {
+    let newIdx = oldIdx;
+    if (oldIdx === fromIndex) {
+      newIdx = toIndex;
+    } else {
+      if (fromIndex < toIndex) {
+        // Item moved down: indices between (from, to] shift up by 1
+        if (oldIdx > fromIndex && oldIdx <= toIndex) newIdx = oldIdx - 1;
+      } else {
+        // Item moved up: indices between [to, from) shift down by 1
+        if (oldIdx >= toIndex && oldIdx < fromIndex) newIdx = oldIdx + 1;
+      }
+    }
+    newSelected.add(newIdx);
+  }
+  state.selected = newSelected;
+
+  // Re-render preserving the current search query for highlighting
+  const query = document.getElementById('searchInput').value;
+  const isRegex = document.getElementById('regexToggle').checked;
+  renderResults(query, isRegex);
+
+  // Restore checkbox states
+  for (const idx of state.selected) {
+    const row = document.querySelector(`.result-row[data-index="${idx}"]`);
+    if (row) {
+      row.querySelector('input[type="checkbox"]').checked = true;
+      row.classList.add('selected');
+    }
+  }
+  updateSelectedCount();
+}
+
 function highlightText(text, query, isRegex) {
   try {
-    const pattern = isRegex ? new RegExp(`(${query})`, 'gi') : new RegExp(`(${escapeRegex(query)})`, 'gi');
+    // Handle comma-separated terms
+    const terms = query.split(',').map(t => t.trim()).filter(Boolean);
+    const patterns = terms.map(t => isRegex ? t : escapeRegex(t));
+    const combined = patterns.join('|');
+    const pattern = new RegExp(`(${combined})`, 'gi');
     return text.replace(pattern, '<mark>$1</mark>');
   } catch {
     return escapeHtml(text);
@@ -308,13 +583,54 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
+function editSubtitle(index, btn) {
+  const row = btn.closest('.result-row');
+  const textSpan = row.querySelector('.text');
+
+  // Replace span with input
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'text-edit';
+  input.value = state.results[index].text;
+
+  let saved = false;
+  function save() {
+    if (saved) return;
+    saved = true;
+    const newText = input.value.trim();
+    if (newText && newText !== state.results[index].text) {
+      state.results[index].text = newText;
+      state.results[index]._edited = true;
+      textSpan.innerHTML = escapeHtml(newText);
+      textSpan.classList.add('edited');
+    } else {
+      // Restore original highlighted text if unchanged
+      textSpan.innerHTML = textSpan.dataset.original || escapeHtml(state.results[index].text);
+    }
+    textSpan.style.display = '';
+    input.remove();
+    btn.textContent = 'Edit';
+  }
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); save(); }
+    if (e.key === 'Escape') { saved = true; textSpan.style.display = ''; input.remove(); btn.textContent = 'Edit'; }
+  });
+  input.addEventListener('blur', save);
+
+  textSpan.dataset.original = textSpan.innerHTML;
+  textSpan.style.display = 'none';
+  textSpan.parentNode.insertBefore(input, textSpan);
+  input.focus();
+  input.select();
+  btn.textContent = 'Save';
+}
+
 function toggleSelect(index, checked) {
   if (checked) state.selected.add(index);
   else state.selected.delete(index);
-
   const row = document.querySelector(`.result-row[data-index="${index}"]`);
   if (row) row.classList.toggle('selected', checked);
-
   updateSelectedCount();
 }
 
@@ -335,12 +651,21 @@ function selectNone() {
 function updateSelectedCount() {
   const btn = document.getElementById('exportBtn');
   const n = state.selected.size;
-  btn.textContent = n > 0 ? `Export Supercut (${n})` : 'Export Supercut';
+  btn.textContent = n > 0 ? `Export (${n})` : 'Export';
   btn.disabled = n === 0;
+  document.getElementById('previewAllBtn').disabled = n === 0;
+}
+
+// -----------------------------------------------------------------------
+// Single clip preview
+// -----------------------------------------------------------------------
+function previewByIndex(i) {
+  const r = state.results[i];
+  previewClip(r.video_id, r.start_seconds, r.end_seconds, r.text);
 }
 
 let previewTimer = null;
-function previewClip(videoId, startSeconds, endSeconds, text) {
+function previewClip(videoId, startSeconds, endSeconds, text, onEnded) {
   const panel = document.getElementById('previewPanel');
   const video = document.getElementById('previewVideo');
   const textEl = document.getElementById('previewText');
@@ -348,48 +673,130 @@ function previewClip(videoId, startSeconds, endSeconds, text) {
   panel.style.display = 'block';
   textEl.textContent = text;
 
+  if (previewTimer) { clearInterval(previewTimer); previewTimer = null; }
+
+  function beginPlay() {
+    video.onloadedmetadata = null;
+    video.onseeked = null;
+    video.play().catch((e) => console.warn('[preview] play() failed:', e));
+    previewTimer = setInterval(() => {
+      if (video.currentTime >= endSeconds) {
+        video.pause();
+        clearInterval(previewTimer);
+        previewTimer = null;
+        if (onEnded) onEnded();
+      }
+    }, 100);
+  }
+
+  function seekAndPlay() {
+    video.onloadedmetadata = null;
+    if (Math.abs(video.currentTime - startSeconds) < 0.01) {
+      beginPlay();
+    } else {
+      video.onseeked = () => { beginPlay(); };
+      video.currentTime = startSeconds;
+    }
+  }
+
   const src = `/api/video/${videoId}/stream`;
   if (video.dataset.src !== src) {
-    video.src = src;
+    video.pause();
     video.dataset.src = src;
+    video.src = src;
+    video.onloadedmetadata = () => { seekAndPlay(); };
+  } else {
+    video.pause();
+    seekAndPlay();
   }
-  video.currentTime = startSeconds;
-
-  if (previewTimer) clearInterval(previewTimer);
-  video.play();
-  previewTimer = setInterval(() => {
-    if (video.currentTime >= endSeconds) {
-      video.pause();
-      clearInterval(previewTimer);
-    }
-  }, 100);
 }
 
-async function exportSupercut() {
+// -----------------------------------------------------------------------
+// Preview all selected clips in sequence
+// -----------------------------------------------------------------------
+let previewAllActive = false;
+let previewAllQueue = [];
+let previewAllIndex = 0;
+
+function previewAllSelected() {
+  // Use array order (reflects drag-and-drop reordering)
+  const indices = state.results.map((_, i) => i).filter(i => state.selected.has(i));
+  if (indices.length === 0) return;
+
+  previewAllActive = true;
+  previewAllQueue = indices;
+  previewAllIndex = 0;
+  playNextInQueue();
+}
+
+function playNextInQueue() {
+  if (!previewAllActive || previewAllIndex >= previewAllQueue.length) {
+    stopPreviewAll();
+    return;
+  }
+
+  const idx = previewAllQueue[previewAllIndex];
+  const r = state.results[idx];
+  const progressEl = document.getElementById('previewProgress');
+  progressEl.textContent = `Playing ${previewAllIndex + 1} / ${previewAllQueue.length}`;
+
+  // Highlight current row
+  document.querySelectorAll('.result-row').forEach(row => row.style.outline = '');
+  const currentRow = document.querySelector(`.result-row[data-index="${idx}"]`);
+  if (currentRow) {
+    currentRow.style.outline = '2px solid #4ecdc4';
+    currentRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  previewClip(r.video_id, r.start_seconds, r.end_seconds, r.text, () => {
+    previewAllIndex++;
+    playNextInQueue();
+  });
+}
+
+function stopPreviewAll() {
+  previewAllActive = false;
+  previewAllQueue = [];
+  previewAllIndex = 0;
+  document.getElementById('previewProgress').textContent = '';
+  document.querySelectorAll('.result-row').forEach(row => row.style.outline = '');
+}
+
+// -----------------------------------------------------------------------
+// Export
+// -----------------------------------------------------------------------
+async function doExport() {
   if (state.selected.size === 0) return;
 
-  const clips = Array.from(state.selected)
-    .sort((a, b) => a - b)
-    .map(i => state.results[i])
-    .map(r => ({ video_id: r.video_id, start_seconds: r.start_seconds, end_seconds: r.end_seconds }));
+  // Use array order (reflects drag-and-drop reordering)
+  const clips = state.results
+    .map((r, i) => ({ r, i }))
+    .filter(({ i }) => state.selected.has(i))
+    .map(({ r }) => ({ video_id: r.video_id, start_seconds: r.start_seconds, end_seconds: r.end_seconds, text: r.text }));
 
   const padding = parseFloat(document.getElementById('paddingInput').value) || 0;
+  const shuffle = document.getElementById('shuffleToggle').checked;
+  const burn_subtitles = document.getElementById('burnSubsToggle').checked;
+  const format = document.getElementById('exportFormat').value;
 
   const btn = document.getElementById('exportBtn');
   btn.disabled = true;
-  btn.textContent = 'Exporting...';
-  setStatus('Building supercut... this may take a moment');
+  const originalText = btn.textContent;
+
+  const isVideo = (format === 'supercut' || format === 'clips');
+  btn.textContent = isVideo ? 'Exporting...' : 'Generating...';
+  setStatus(isVideo ? 'Building with ffmpeg... this may take a moment' : 'Generating file...');
 
   try {
     const res = await fetch('/api/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clips, padding }),
+      body: JSON.stringify({ clips, padding, shuffle, burn_subtitles, format }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
-    setStatus('Supercut ready! Downloading...', 'success');
+    setStatus('Ready! Downloading...', 'success');
     const a = document.createElement('a');
     a.href = `/api/export/${data.filename}`;
     a.download = data.filename;
@@ -399,6 +806,69 @@ async function exportSupercut() {
   } finally {
     btn.disabled = false;
     updateSelectedCount();
+  }
+}
+
+// -----------------------------------------------------------------------
+// N-grams modal
+// -----------------------------------------------------------------------
+function openNgrams() {
+  document.getElementById('ngramModal').classList.add('active');
+  loadNgrams(1);
+}
+
+function closeNgrams() {
+  document.getElementById('ngramModal').classList.remove('active');
+}
+
+// Close modal on overlay click
+document.getElementById('ngramModal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeNgrams();
+});
+
+async function loadNgrams(n) {
+  // Update active tab
+  const tabs = document.querySelectorAll('#ngramTabs button');
+  tabs.forEach((t, i) => t.classList.toggle('active', i === n - 1));
+
+  const list = document.getElementById('ngramList');
+  list.innerHTML = '<li style="color:#888;padding:1rem;text-align:center;">Loading...</li>';
+
+  try {
+    const res = await fetch(`/api/ngrams?n=${n}&top=50`);
+    const data = await res.json();
+
+    if (data.results.length === 0) {
+      list.innerHTML = '<li style="color:#888;padding:1rem;text-align:center;">No data. Upload videos with subtitles first.</li>';
+      return;
+    }
+
+    const maxCount = data.results[0].count;
+    list.innerHTML = '';
+    for (const item of data.results) {
+      const li = document.createElement('li');
+      li.className = 'ngram-item';
+      const barWidth = Math.max(2, (item.count / maxCount) * 100);
+      li.innerHTML = `
+        <span class="word">${escapeHtml(item.text)}</span>
+        <span class="freq">${item.count}</span>
+      `;
+      li.title = `Click to search for "${item.text}"`;
+      li.addEventListener('click', () => {
+        document.getElementById('searchInput').value = item.text;
+        closeNgrams();
+        doSearch();
+      });
+
+      const bar = document.createElement('div');
+      bar.className = 'ngram-bar';
+      bar.style.width = barWidth + '%';
+      li.appendChild(bar);
+
+      list.appendChild(li);
+    }
+  } catch (e) {
+    list.innerHTML = `<li style="color:#e94560;padding:1rem;">${e.message}</li>`;
   }
 }
 
