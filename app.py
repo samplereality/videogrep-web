@@ -332,11 +332,14 @@ def upload():
     video_dir = os.path.join(app.config["UPLOAD_FOLDER"], video_id)
     os.makedirs(video_dir, exist_ok=True)
 
-    video_path = os.path.join(video_dir, video_file.filename)
+    # Strip any directory components (webkitdirectory sends relative paths)
+    video_name = os.path.basename(video_file.filename)
+    video_path = os.path.join(video_dir, video_name)
     video_file.save(video_path)
 
     if subtitle_file:
-        subtitle_path = os.path.join(video_dir, subtitle_file.filename)
+        sub_name = os.path.basename(subtitle_file.filename)
+        subtitle_path = os.path.join(video_dir, sub_name)
         subtitle_file.save(subtitle_path)
         subtitles = parse_subtitle_file(subtitle_path)
         word_level = os.path.splitext(subtitle_file.filename)[1].lower() == ".vtt" and is_word_level(subtitles)
@@ -345,21 +348,45 @@ def upload():
         subtitles = []
         word_level = False
 
+    # Detect suspicious subtitles (many cues crammed into a tiny time range)
+    warning = None
+    if len(subtitles) > 20:
+        last_ts = subtitles[-1]["end_seconds"]
+        if last_ts < 30:
+            warning = (
+                f"Subtitle timestamps span only {last_ts:.1f}s but there are "
+                f"{len(subtitles)} cues — the SRT file may have broken timestamps. "
+                f"Consider re-transcribing with Whisper."
+            )
+
     videos[video_id] = {
-        "name": video_file.filename,
+        "name": video_name,
         "video_path": video_path,
         "subtitle_path": subtitle_path,
         "subtitles": subtitles,
         "word_level": word_level,
         "offset": 0.0,
+        "warning": warning,
     }
+
+    if subtitle_file:
+        sub_basename = os.path.basename(subtitle_file.filename)
+        ts_range = ""
+        if subtitles:
+            first = subtitles[0]["start_seconds"]
+            last = subtitles[-1]["end_seconds"]
+            ts_range = f" (timestamps {first:.1f}s – {last:.1f}s)"
+        print(f"[upload] id={video_id} video={video_name} with {len(subtitles)} subtitles from {sub_basename}{ts_range}")
+    else:
+        print(f"[upload] id={video_id} video={video_name} no subtitles")
 
     return jsonify({
         "id": video_id,
-        "name": video_file.filename,
+        "name": video_name,
         "subtitle_count": len(subtitles),
         "word_level": word_level,
         "needs_transcription": subtitle_path is None,
+        "warning": warning,
     })
 
 
@@ -374,6 +401,7 @@ def list_videos():
             "word_level": info.get("word_level", False),
             "offset": info.get("offset", 0.0),
             "needs_transcription": info.get("subtitle_path") is None and len(info["subtitles"]) == 0,
+            "warning": info.get("warning"),
         })
     return jsonify(result)
 
@@ -712,6 +740,21 @@ def export_supercut():
             for cp in clip_files:
                 f.write(f"file '{cp}'\n")
 
+        # Always generate an SRT file alongside the supercut
+        srt_out_path = os.path.join(app.config["EXPORT_FOLDER"], f"{export_id}_supercut.srt")
+        running = 0.0
+        srt_idx = 0
+        with open(srt_out_path, "w", encoding="utf-8") as sf:
+            for clip in clips:
+                clip_dur = clip["end_seconds"] - clip["start_seconds"]
+                text = clip.get("text", "")
+                if text:
+                    srt_idx += 1
+                    start_ts = seconds_to_timestamp(running).replace(".", ",")
+                    end_ts = seconds_to_timestamp(running + clip_dur).replace(".", ",")
+                    sf.write(f"{srt_idx}\n{start_ts} --> {end_ts}\n{text}\n\n")
+                running += clip_dur
+
         output_path = os.path.join(app.config["EXPORT_FOLDER"], f"{export_id}_supercut.mp4")
         cmd = [
             "ffmpeg", "-y",
@@ -719,21 +762,9 @@ def export_supercut():
             "-i", concat_list_path,
         ]
 
-        # If burn_subs requested but no drawtext, mux a combined SRT into the final supercut
-        srt_combined = None
+        # If burn_subs requested but no drawtext, mux the SRT into the final supercut
         if burn_subs and not HAS_DRAWTEXT:
-            srt_combined = os.path.join(app.config["EXPORT_FOLDER"], f"{export_id}_subs.srt")
-            running = 0.0
-            with open(srt_combined, "w", encoding="utf-8") as sf:
-                for idx, clip in enumerate(clips):
-                    clip_dur = clip["end_seconds"] - clip["start_seconds"]
-                    text = clip.get("text", "")
-                    if text:
-                        start_ts = seconds_to_timestamp(running).replace(".", ",")
-                        end_ts = seconds_to_timestamp(running + clip_dur).replace(".", ",")
-                        sf.write(f"{idx + 1}\n{start_ts} --> {end_ts}\n{text}\n\n")
-                    running += clip_dur
-            cmd += ["-i", srt_combined,
+            cmd += ["-i", srt_out_path,
                     "-map", "0:v", "-map", "0:a", "-map", "1:s",
                     "-c:v", "libx264", "-c:a", "aac", "-c:s", "mov_text",
                     "-preset", "fast",
@@ -743,12 +774,14 @@ def export_supercut():
 
         cmd.append(output_path)
         result = subprocess.run(cmd, capture_output=True, timeout=300)
-        if srt_combined and os.path.exists(srt_combined):
-            os.remove(srt_combined)
         if result.returncode != 0:
             return jsonify({"error": f"Concat failed: {result.stderr.decode()[-500:]}"}), 500
 
-        return jsonify({"export_id": export_id, "filename": f"{export_id}_supercut.mp4"})
+        return jsonify({
+            "export_id": export_id,
+            "filename": f"{export_id}_supercut.mp4",
+            "srt_filename": f"{export_id}_supercut.srt",
+        })
 
     finally:
         for cp in clip_files:

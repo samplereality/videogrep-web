@@ -154,10 +154,15 @@
 
       <div class="upload-form" id="uploadForm">
         <label>Video file:</label>
-        <input type="file" id="videoFile" accept="video/*">
+        <input type="file" id="videoFile" accept="video/*" onchange="document.getElementById('folderInput').value=''; document.getElementById('folderMatchNote').style.display='none';">
         <label>Subtitle file (.srt or .vtt):</label>
         <input type="file" id="srtFile" accept=".srt,.vtt">
         <p class="subtitle-note" id="subtitleNote" style="display:none;">Optional if Whisper is available for auto-transcription</p>
+        <div style="margin: 0.75rem 0 0.25rem; border-top: 1px solid #0f3460; padding-top: 0.75rem;">
+          <label style="font-size:0.8rem; color:#aaa;">Or select a folder to auto-match subtitles:</label>
+          <input type="file" id="folderInput" webkitdirectory style="font-size:0.85rem; width:100%;" onchange="previewFolderMatches()">
+          <p class="subtitle-note" id="folderMatchNote" style="display:none; color:#4ecdc4; max-height:120px; overflow-y:auto;"></p>
+        </div>
         <br>
         <button class="btn-primary" onclick="uploadFiles()" id="uploadBtn">Upload</button>
         <button class="btn-secondary" onclick="toggleUploadForm()">Cancel</button>
@@ -196,7 +201,7 @@
         <button class="btn-secondary" onclick="selectNone()">Select None</button>
         <div class="export-options">
           <label>Padding:</label>
-          <input type="number" id="paddingInput" value="0" min="0" max="5" step="0.1">
+          <input type="number" id="paddingInput" value="0" min="0" max="5" step="0.1" oninput="updateSelectedCount()">
           <label title="Randomize clip order before export"><input type="checkbox" id="shuffleToggle"> Shuffle</label>
           <label title="Burn subtitle text into video"><input type="checkbox" id="burnSubsToggle"> Burn subs</label>
           <label>Format:</label>
@@ -208,6 +213,7 @@
           </select>
         </div>
         <button class="btn-primary" onclick="doExport()" id="exportBtn">Export</button>
+        <span id="selectionDuration" style="color:#888; font-size:0.8rem; white-space:nowrap;"></span>
         <button class="btn-secondary" onclick="previewAllSelected()" id="previewAllBtn" title="Preview all selected clips in sequence">Preview Selected</button>
       </div>
     </div>
@@ -267,13 +273,134 @@ const emptyState = document.getElementById('emptyState');
 
 function toggleUploadForm() {
   document.getElementById('uploadForm').classList.toggle('active');
+  // Clear folder match preview when closing
+  document.getElementById('folderMatchNote').style.display = 'none';
+}
+
+function previewFolderMatches() {
+  const folderFiles = document.getElementById('folderInput').files;
+  const note = document.getElementById('folderMatchNote');
+  if (folderFiles.length === 0) { note.style.display = 'none'; return; }
+
+  const videoExts = new Set(['.mp4','.mov','.avi','.mkv','.webm','.m4v','.mpg','.mpeg','.wmv']);
+  const subExts = new Set(['.srt','.vtt']);
+  const allFiles = Array.from(folderFiles);
+  const videos = allFiles.filter(f => videoExts.has(f.name.slice(f.name.lastIndexOf('.')).toLowerCase()));
+  const subs = allFiles.filter(f => subExts.has(f.name.slice(f.name.lastIndexOf('.')).toLowerCase()));
+
+  const subMap = {};
+  subs.forEach(f => {
+    const rel = f.webkitRelativePath || f.name;
+    const dir = rel.substring(0, rel.lastIndexOf('/') + 1);
+    const base = f.name.substring(0, f.name.lastIndexOf('.'));
+    subMap[(dir + base).toLowerCase()] = f.name;
+  });
+
+  let matched = 0;
+  const lines = videos.map(vf => {
+    const rel = vf.webkitRelativePath || vf.name;
+    const dir = rel.substring(0, rel.lastIndexOf('/') + 1);
+    const base = vf.name.substring(0, vf.name.lastIndexOf('.')).toLowerCase();
+    const sub = subMap[(dir + base).toLowerCase()];
+    if (sub) { matched++; return `${vf.name} + ${sub}`; }
+    return `${vf.name} (no subtitle)`;
+  });
+
+  const ignored = allFiles.length - videos.length - subs.length;
+  note.style.display = 'block';
+  note.innerHTML = `Found ${videos.length} video${videos.length !== 1 ? 's' : ''}, ${matched} with matching subtitles` +
+    (ignored > 0 ? ` (${ignored} other file${ignored !== 1 ? 's' : ''} ignored)` : '') +
+    `:<br>` + lines.map(l => `&nbsp;&nbsp;${l}`).join('<br>');
+
+  // Clear manual inputs when folder is selected
+  document.getElementById('videoFile').value = '';
+  document.getElementById('srtFile').value = '';
+}
+
+async function uploadOnePair(videoFile, srtFile) {
+  const form = new FormData();
+  form.append('video', videoFile);
+  if (srtFile) form.append('srt', srtFile);
+  const res = await fetch('/api/upload', { method: 'POST', body: form });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
 }
 
 async function uploadFiles() {
+  const folderFiles = document.getElementById('folderInput').files;
+
+  // ---- Folder-based upload: auto-match videos with subtitles ----
+  if (folderFiles.length > 0) {
+    const videoExts = new Set(['.mp4','.mov','.avi','.mkv','.webm','.m4v','.mpg','.mpeg','.wmv']);
+    const subExts = new Set(['.srt','.vtt']);
+
+    const allFiles = Array.from(folderFiles);
+    const videos = allFiles.filter(f => videoExts.has(f.name.slice(f.name.lastIndexOf('.')).toLowerCase()));
+    const subs = allFiles.filter(f => subExts.has(f.name.slice(f.name.lastIndexOf('.')).toLowerCase()));
+
+    if (videos.length === 0) {
+      setStatus('No video files found in the selected folder', 'error');
+      return;
+    }
+
+    // Build a map of baseName → subtitle file, keyed by
+    // directory-relative path so that subdirectories don't collide.
+    const subMap = {};
+    subs.forEach(f => {
+      // Use relative path's directory + base name for matching
+      const rel = f.webkitRelativePath || f.name;
+      const dir = rel.substring(0, rel.lastIndexOf('/') + 1);
+      const base = f.name.substring(0, f.name.lastIndexOf('.'));
+      subMap[(dir + base).toLowerCase()] = f;
+    });
+
+    const btn = document.getElementById('uploadBtn');
+    btn.disabled = true;
+    let uploaded = 0;
+    const warnings = [];
+
+    try {
+      for (const vf of videos) {
+        const rel = vf.webkitRelativePath || vf.name;
+        const dir = rel.substring(0, rel.lastIndexOf('/') + 1);
+        const base = vf.name.substring(0, vf.name.lastIndexOf('.'));
+        const matchedSub = subMap[(dir + base).toLowerCase()] || null;
+        btn.textContent = `Uploading ${uploaded + 1}/${videos.length}...`;
+        setStatus(`Uploading "${vf.name}"${matchedSub ? ` with ${matchedSub.name}` : ''}...`);
+
+        if (!matchedSub && !state.whisperAvailable) {
+          setStatus(`Skipped "${vf.name}" — no matching subtitle and Whisper not available`, 'error');
+          continue;
+        }
+
+        const result = await uploadOnePair(vf, matchedSub);
+        uploaded++;
+        if (result.warning) {
+          console.warn(`[upload] ${vf.name}: ${result.warning}`);
+          warnings.push(vf.name);
+        }
+      }
+      let msg = `Uploaded ${uploaded} video${uploaded !== 1 ? 's' : ''} from folder`;
+      if (warnings.length > 0) msg += ` (${warnings.length} with bad subtitle timestamps)`;
+      setStatus(msg, warnings.length > 0 ? 'error' : 'success');
+      toggleUploadForm();
+      document.getElementById('folderInput').value = '';
+      loadVideos();
+    } catch (e) {
+      setStatus('Upload failed: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Upload';
+    }
+    return;
+  }
+
+  // ---- Manual file inputs ----
   const videoFile = document.getElementById('videoFile').files[0];
   const srtFile = document.getElementById('srtFile').files[0];
   if (!videoFile) {
-    setStatus('Please select a video file', 'error');
+    setStatus('Please select a video file, or choose a folder', 'error');
     return;
   }
   if (!srtFile && !state.whisperAvailable) {
@@ -286,18 +413,13 @@ async function uploadFiles() {
   btn.textContent = 'Uploading...';
   setStatus('Uploading files...');
 
-  const form = new FormData();
-  form.append('video', videoFile);
-  if (srtFile) form.append('srt', srtFile);
-
   try {
-    const res = await fetch('/api/upload', { method: 'POST', body: form });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    const data = await uploadOnePair(videoFile, srtFile);
     let msg = `Uploaded "${data.name}"`;
     if (data.subtitle_count > 0) msg += ` with ${data.subtitle_count} subtitles`;
     else if (data.needs_transcription) msg += ' (needs transcription)';
-    setStatus(msg, 'success');
+    if (data.warning) msg += ` — Warning: ${data.warning}`;
+    setStatus(msg, data.warning ? 'error' : 'success');
     toggleUploadForm();
     document.getElementById('videoFile').value = '';
     document.getElementById('srtFile').value = '';
@@ -324,11 +446,14 @@ function renderVideoList() {
     li.className = 'video-item';
 
     const needsTranscribe = v.needs_transcription;
-    const transcribeBtn = needsTranscribe && state.whisperAvailable
-      ? `<button class="transcribe-btn" onclick="transcribeVideo('${v.id}', this); event.stopPropagation();">Transcribe</button>`
+    const transcribeBtn = (needsTranscribe || v.warning) && state.whisperAvailable
+      ? `<button class="transcribe-btn" onclick="transcribeVideo('${v.id}', this); event.stopPropagation();">${v.warning ? 'Re-transcribe' : 'Transcribe'}</button>`
       : '';
     const noSubsNote = needsTranscribe && !state.whisperAvailable
       ? '<span style="color:#e94560;font-size:0.75rem;">No subtitles</span>'
+      : '';
+    const warningNote = v.warning
+      ? '<span style="color:#e94560;font-size:0.7rem;display:block;margin-top:0.25rem;" title="' + v.warning + '">Bad timestamps — try Re-transcribe</span>'
       : '';
 
     li.innerHTML = `
@@ -340,6 +465,7 @@ function renderVideoList() {
         ${noSubsNote}
         <button class="delete-btn" title="Delete video and transcript" onclick="deleteVideo('${v.id}')">Delete</button>
       </div>
+      ${warningNote}
       <div class="video-item-controls">
         <label>Offset:</label>
         <input type="number" value="${v.offset || 0}" step="0.1" title="Shift subtitles by N seconds"
@@ -648,12 +774,31 @@ function selectNone() {
   updateSelectedCount();
 }
 
+function formatDuration(secs) {
+  if (secs < 60) return `${secs.toFixed(1)}s`;
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  if (m < 60) return `${m}m ${s}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m ${s}s`;
+}
+
 function updateSelectedCount() {
   const btn = document.getElementById('exportBtn');
   const n = state.selected.size;
+  const padding = parseFloat(document.getElementById('paddingInput').value) || 0;
+
+  let totalDur = 0;
+  for (const i of state.selected) {
+    const r = state.results[i];
+    if (r) totalDur += (r.end_seconds - r.start_seconds) + padding * 2;
+  }
+
+  const durStr = n > 0 ? ` / ${formatDuration(totalDur)}` : '';
   btn.textContent = n > 0 ? `Export (${n})` : 'Export';
   btn.disabled = n === 0;
   document.getElementById('previewAllBtn').disabled = n === 0;
+  document.getElementById('selectionDuration').textContent = n > 0 ? durStr : '';
 }
 
 // -----------------------------------------------------------------------
@@ -801,6 +946,15 @@ async function doExport() {
     a.href = `/api/export/${data.filename}`;
     a.download = data.filename;
     a.click();
+    // Also download the SRT if one was generated
+    if (data.srt_filename) {
+      setTimeout(() => {
+        const a2 = document.createElement('a');
+        a2.href = `/api/export/${data.srt_filename}`;
+        a2.download = data.srt_filename;
+        a2.click();
+      }, 500);
+    }
   } catch (e) {
     setStatus('Export failed: ' + e.message, 'error');
   } finally {
