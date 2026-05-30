@@ -110,12 +110,25 @@ pip install cryptography
 SSL_ADHOC=1 python app.py
 ```
 
-**Trusted local certificate** with [mkcert](https://github.com/FiloSottile/mkcert) (no warning):
+**Trusted local certificate** with [mkcert](https://github.com/FiloSottile/mkcert) (no warning). This is a two-step process:
 
 ```bash
-mkcert localhost                 # creates localhost.pem + localhost-key.pem
+# 1. One-time setup: install mkcert's local CA into your system/browser trust
+#    store. This does NOT create any files in the project — it's what makes
+#    certificates signed by mkcert trusted (so the browser shows no warning).
+mkcert -install
+
+# 2. Generate the certificate + key for localhost. Run this from the project
+#    folder — it writes localhost.pem and localhost-key.pem here.
+#    (Both are gitignored; never commit them.)
+mkcert localhost
+
+# 3. Run the app pointing at those files.
 SSL_CERT=localhost.pem SSL_KEY=localhost-key.pem python app.py
 ```
+
+Step 1 is only needed once per machine. If you ever delete the `.pem` files,
+just re-run `mkcert localhost` to regenerate them.
 
 Then open https://localhost:5001.
 
