@@ -5,3 +5,8 @@ __pycache__/
 *.pyc
 uploads/
 exports/
+
+# TLS certificates / keys (e.g. from `mkcert` or SSL_ADHOC) — never commit
+*.pem
+*.key
+*.crt
