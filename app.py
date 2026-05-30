@@ -1,6 +1,9 @@
 import os
 import re
+import time
 import uuid
+import glob
+import shutil
 import random
 import subprocess
 import zipfile
@@ -15,7 +18,38 @@ app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024 * 1024  # 2GB
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 os.makedirs(app.config["EXPORT_FOLDER"], exist_ok=True)
 
+# Delete exported files older than this many seconds (overridable via env).
+EXPORT_MAX_AGE = int(os.environ.get("EXPORT_MAX_AGE", str(2 * 60 * 60)))  # 2h
+
+
+def cleanup_old_exports(max_age=EXPORT_MAX_AGE):
+    """Remove export files older than max_age seconds so the folder doesn't grow unbounded."""
+    folder = app.config["EXPORT_FOLDER"]
+    now = time.time()
+    try:
+        for name in os.listdir(folder):
+            path = os.path.join(folder, name)
+            try:
+                if os.path.isfile(path) and now - os.path.getmtime(path) > max_age:
+                    os.remove(path)
+            except OSError:
+                pass
+    except FileNotFoundError:
+        pass
+
 # In-memory store: {video_id: {name, video_path, subtitle_path, subtitles, word_level, offset}}
+#
+# NOTE: This is a process-local dict, not a persistent database. Two consequences
+# to keep in mind before deploying:
+#   1. All loaded videos/transcripts are lost when the process restarts. The
+#      media files survive on disk under uploads/<id>/, but the parsed subtitle
+#      data and metadata held here do not, so a restart effectively empties the
+#      library until videos are re-added.
+#   2. It is not shared across worker processes. Under a multi-worker WSGI server
+#      (e.g. `gunicorn -w 4`) each worker has its own copy, so an upload handled
+#      by one worker is invisible to requests routed to another.
+# For now, run a single worker (`gunicorn -w 1`). If this ever needs to scale or
+# persist, replace this dict with a shared store (SQLite, Redis, etc.).
 videos = {}
 
 
@@ -435,7 +469,6 @@ def set_offset(video_id):
 def delete_video(video_id):
     if video_id not in videos:
         return jsonify({"error": "Video not found"}), 404
-    import shutil
     video_dir = os.path.join(app.config["UPLOAD_FOLDER"], video_id)
     if os.path.exists(video_dir):
         shutil.rmtree(video_dir)
@@ -612,6 +645,9 @@ def export_supercut():
     data = request.get_json()
     if not data or "clips" not in data:
         return jsonify({"error": "clips array is required"}), 400
+
+    # Purge stale exports from previous runs before writing new ones.
+    cleanup_old_exports()
 
     clips = data["clips"]
     padding = float(data.get("padding", 0))
@@ -791,8 +827,7 @@ def export_supercut():
         if os.path.exists(list_file):
             os.remove(list_file)
         # Clean up temp subtitle text files from drawtext
-        import glob as _glob
-        for tf in _glob.glob(os.path.join(app.config["EXPORT_FOLDER"], f"{export_id}_txt_*")):
+        for tf in glob.glob(os.path.join(app.config["EXPORT_FOLDER"], f"{export_id}_txt_*")):
             os.remove(tf)
 
 
@@ -855,4 +890,25 @@ def transcribe(video_id):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    # Production-safe defaults; override via environment when needed.
+    #   FLASK_DEBUG=1   enable the debugger/reloader (off by default)
+    #   HOST=0.0.0.0    bind on all interfaces for LAN/remote access
+    #   PORT=5001       listen port
+    # HTTPS on localhost (pick one):
+    #   SSL_ADHOC=1               self-signed cert generated at startup
+    #                             (requires `pip install cryptography`; browser
+    #                             will warn about the untrusted certificate)
+    #   SSL_CERT=... SSL_KEY=...  paths to a real cert/key pair, e.g. from
+    #                             `mkcert localhost` for a trusted local cert
+    debug = os.environ.get("FLASK_DEBUG", "0").lower() in ("1", "true", "yes", "on")
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", "5001"))
+
+    ssl_context = None
+    cert, key = os.environ.get("SSL_CERT"), os.environ.get("SSL_KEY")
+    if cert and key:
+        ssl_context = (cert, key)
+    elif os.environ.get("SSL_ADHOC", "0").lower() in ("1", "true", "yes", "on"):
+        ssl_context = "adhoc"
+
+    app.run(host=host, port=port, debug=debug, ssl_context=ssl_context)

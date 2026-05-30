@@ -88,6 +88,37 @@ Open http://localhost:5001 in your browser.
 
 To stop the server, press `Ctrl+C` in the terminal.
 
+### Configuration (environment variables)
+
+The server reads a few optional environment variables at startup:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FLASK_DEBUG` | `0` | Set to `1` to enable the debugger/auto-reloader (development only). |
+| `HOST` | `127.0.0.1` | Bind address. Set to `0.0.0.0` to allow access from other devices on your network. |
+| `PORT` | `5001` | Listen port. |
+| `EXPORT_MAX_AGE` | `7200` | Seconds before old export files are auto-deleted (2 hours). |
+
+### Running with HTTPS
+
+Some browser features (and a more production-like setup) want HTTPS. Two options:
+
+**Quick self-signed certificate** (browser shows a one-time security warning):
+
+```bash
+pip install cryptography
+SSL_ADHOC=1 python app.py
+```
+
+**Trusted local certificate** with [mkcert](https://github.com/FiloSottile/mkcert) (no warning):
+
+```bash
+mkcert localhost                 # creates localhost.pem + localhost-key.pem
+SSL_CERT=localhost.pem SSL_KEY=localhost-key.pem python app.py
+```
+
+Then open https://localhost:5001.
+
 ## Usage
 
 ### Upload
